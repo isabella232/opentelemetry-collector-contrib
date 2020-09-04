@@ -98,7 +98,7 @@ const (
 	Summary
 )
 
-func MapMetrics(exp MetricsExporter, md pdata.Metrics) (map[string][]MetricValue, int, error) {
+func MapMetrics(exp MetricsExporter, md pdata.Metrics) (map[string][]MetricValue, int) {
 	// Transform it into OpenCensus format
 	data := pdatautil.MetricsToMetricsData(md)
 
@@ -271,5 +271,5 @@ func MapMetrics(exp MetricsExporter, md pdata.Metrics) (map[string][]MetricValue
 		}
 	}
 
-	return metrics, droppedTimeSeries, nil
+	return metrics, droppedTimeSeries
 }

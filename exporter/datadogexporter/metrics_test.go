@@ -98,17 +98,26 @@ func NewMetricsData(metrics []*v1.Metric) pdata.Metrics {
 func TestMapNumericMetric(t *testing.T) {
 	ts := time.Now()
 
+	intValue := &v1.Point{
+		Timestamp: metricstest.Timestamp(ts),
+		Value:     &v1.Point_Int64Value{Int64Value: 17},
+	}
+
 	md := NewMetricsData([]*v1.Metric{
 		metricstest.Gauge("gauge.float64.test", testKeys[:],
 			metricstest.Timeseries(ts, testValues[:], metricstest.Double(ts, math.Pi))),
 		metricstest.Cumulative("cumulative.float64.test", testKeys[:],
 			metricstest.Timeseries(ts, testValues[:], metricstest.Double(ts, math.Pi))),
+
+		metricstest.GaugeInt("gauge.int64.test", testKeys[:],
+			metricstest.Timeseries(ts, testValues[:], intValue)),
+		metricstest.CumulativeInt("cumulative.int64.test", testKeys[:],
+			metricstest.Timeseries(ts, testValues[:], intValue)),
 	})
 
-	metrics, droppedTimeSeries, err := MapMetrics(mockExporter, md)
+	metrics, droppedTimeSeries := MapMetrics(mockExporter, md)
 
 	assert.Equal(t, 0, droppedTimeSeries)
-	assert.Nil(t, err)
 	assert.Equal(t,
 		map[string][]MetricValue{
 			"cumulative.float64.test": {{
@@ -125,6 +134,20 @@ func TestMapNumericMetric(t *testing.T) {
 				rate:       1,
 				tags:       testTags[:],
 			}},
+			"gauge.int64.test": {{
+				hostname:   "unknown",
+				metricType: Gauge,
+				value:      17,
+				rate:       1,
+				tags:       testTags[:],
+			}},
+			"cumulative.int64.test": {{
+				hostname:   "unknown",
+				metricType: Gauge,
+				value:      17,
+				rate:       1,
+				tags:       testTags[:],
+			}},
 		},
 		metrics,
 	)
@@ -138,12 +161,11 @@ func TestMapDistributionMetric(t *testing.T) {
 			metricstest.Timeseries(ts, testValues[:], metricstest.DistPt(ts, []float64{0.1, 0.2}, []int64{100, 200}))),
 	})
 
-	metrics, _, err := MapMetrics(
+	metrics, _ := MapMetrics(
 		&MockMetricsExporter{cfg: &Config{Metrics: MetricsConfig{Buckets: true}}},
 		md,
 	)
 
-	assert.Nil(t, err)
 	assert.Equal(t, map[string][]MetricValue{
 		"dist.test.count": {{
 			hostname:   "unknown",
@@ -208,13 +230,12 @@ func TestMapSummaryMetric(t *testing.T) {
 		metricstest.Summary("summary.test", testKeys[:], summaryPoint),
 	})
 
-	metrics, _, err := MapMetrics(
+	metrics, _ := MapMetrics(
 		// Enable percentiles for test
 		&MockMetricsExporter{cfg: &Config{Metrics: MetricsConfig{Percentiles: true}}},
 		md,
 	)
 
-	assert.Nil(t, err)
 	assert.Equal(t, map[string][]MetricValue{
 		"summary.test.sum": {{
 			hostname:   "unknown",
@@ -261,4 +282,20 @@ func TestMapSummaryMetric(t *testing.T) {
 	},
 		metrics,
 	)
+}
+
+func TestMapInvalid(t *testing.T) {
+	ts := time.Now()
+	md := NewMetricsData([]*v1.Metric{{
+		MetricDescriptor: &v1.MetricDescriptor{
+			Type: v1.MetricDescriptor_UNSPECIFIED,
+		},
+		Timeseries: []*v1.TimeSeries{metricstest.Timeseries(
+			ts, []string{}, metricstest.Double(ts, 0.0))},
+	}})
+
+	metrics, dropped := MapMetrics(mockExporter, md)
+
+	assert.Equal(t, dropped, 1)
+	assert.Equal(t, metrics, map[string][]MetricValue{})
 }
