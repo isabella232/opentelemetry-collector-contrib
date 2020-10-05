@@ -20,6 +20,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
+	"gopkg.in/zorkian/go-datadog-api.v2"
 )
 
 func TestNewExporter(t *testing.T) {
@@ -50,21 +51,22 @@ func TestProcessMetrics(t *testing.T) {
 
 	require.NoError(t, err)
 
-	var series Series
-	series.Add(NewGauge(
-		"metric_name",
-		0,
-		0,
-		[]string{"key2:val2"},
-	))
+	metrics := []datadog.Metric{
+		newGauge(
+			"metric_name",
+			0,
+			0,
+			[]string{"key2:val2"},
+		),
+	}	 
 
-	exp.processMetrics(&series)
+	exp.processMetrics(metrics)
 
-	assert.Equal(t, "test_host", *series.metrics[0].Host)
-	assert.Equal(t, "test.metric_name", *series.metrics[0].Metric)
+	assert.Equal(t, "test_host", *metrics[0].Host)
+	assert.Equal(t, "test.metric_name", *metrics[0].Metric)
 	assert.ElementsMatch(t,
 		[]string{"key:val", "env:test_env", "key2:val2"},
-		series.metrics[0].Tags,
+		metrics[0].Tags,
 	)
 
 }

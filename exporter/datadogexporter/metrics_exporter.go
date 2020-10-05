@@ -39,32 +39,32 @@ func newMetricsExporter(logger *zap.Logger, cfg *Config) (*metricsExporter, erro
 	return &metricsExporter{logger, cfg, client, tags}, nil
 }
 
-func (exp *metricsExporter) processMetrics(series *Series) {
+func (exp *metricsExporter) processMetrics(metrics []datadog.Metric) {
 	addNamespace := exp.cfg.Metrics.Namespace != ""
 	overrideHostname := exp.cfg.Hostname != ""
 	addTags := len(exp.tags) > 0
 
-	for i := range series.metrics {
+	for i := range metrics {
 		if addNamespace {
-			newName := exp.cfg.Metrics.Namespace + *series.metrics[i].Metric
-			series.metrics[i].Metric = &newName
+			newName := exp.cfg.Metrics.Namespace + *metrics[i].Metric
+			metrics[i].Metric = &newName
 		}
 
-		if overrideHostname || series.metrics[i].GetHost() == "" {
-			series.metrics[i].Host = GetHost(exp.cfg)
+		if overrideHostname || metrics[i].GetHost() == "" {
+			metrics[i].Host = GetHost(exp.cfg)
 		}
 
 		if addTags {
-			series.metrics[i].Tags = append(series.metrics[i].Tags, exp.tags...)
+			metrics[i].Tags = append(metrics[i].Tags, exp.tags...)
 		}
 
 	}
 }
 
 func (exp *metricsExporter) PushMetricsData(ctx context.Context, md pdata.Metrics) (int, error) {
-	series, droppedTimeSeries := MapMetrics(exp.logger, exp.cfg.Metrics, md)
-	exp.processMetrics(&series)
+	metrics, droppedTimeSeries := MapMetrics(exp.logger, exp.cfg.Metrics, md)
+	exp.processMetrics(metrics)
 
-	err := exp.client.PostMetrics(series.metrics)
+	err := exp.client.PostMetrics(metrics)
 	return droppedTimeSeries, err
 }
