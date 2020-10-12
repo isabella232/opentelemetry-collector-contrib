@@ -11,24 +11,23 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+// +build !windows
 
-package datadogexporter
+package system
 
 import (
-	"os"
-	"testing"
-
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"context"
+	"os/exec"
+	"strings"
+	"time"
 )
 
-func TestHost(t *testing.T) {
+func getSystemFQDN() (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*1)
+	defer cancel()
 
-	host := GetHost(&Config{TagsConfig: TagsConfig{Hostname: "test_host"}})
-	assert.Equal(t, *host, "test_host")
+	cmd := exec.CommandContext(ctx, "/bin/hostname", "-f")
 
-	host = GetHost(&Config{})
-	osHostname, err := os.Hostname()
-	require.NoError(t, err)
-	assert.Equal(t, *host, osHostname)
+	out, err := cmd.Output()
+	return strings.TrimSpace(string(out)), err
 }

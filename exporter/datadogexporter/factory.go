@@ -15,24 +15,19 @@ package datadogexporter
 
 import (
 	"context"
-	"time"
 
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/config/configmodels"
 	"go.opentelemetry.io/collector/config/confignet"
 	"go.opentelemetry.io/collector/exporter/exporterhelper"
-	"go.uber.org/zap"
+
+	"github.com/open-telemetry/opentelemetry-collector-contrib/exporter/datadogexporter/config"
+	"github.com/open-telemetry/opentelemetry-collector-contrib/exporter/datadogexporter/metadata"
 )
 
 const (
 	// typeStr is the type of the exporter
 	typeStr = "datadog"
-
-	// DefaultSite is the default site of the Datadog intake to send data to
-	DefaultSite = "datadoghq.com"
-
-	// maxRetries is the maximum number of retries for pushing host metadata
-	maxRetries = 5
 )
 
 // NewFactory creates a Datadog exporter factory
@@ -46,24 +41,24 @@ func NewFactory() component.ExporterFactory {
 
 // createDefaultConfig creates the default exporter configuration
 func createDefaultConfig() configmodels.Exporter {
-	return &Config{
+	return &config.Config{
 		ExporterSettings: configmodels.ExporterSettings{
 			TypeVal: configmodels.Type(typeStr),
 			NameVal: typeStr,
 		},
 
-		API: APIConfig{
+		API: config.APIConfig{
 			Key:  "", // must be set if using API
-			Site: DefaultSite,
+			Site: config.DefaultSite,
 		},
 
-		Metrics: MetricsConfig{
+		Metrics: config.MetricsConfig{
 			TCPAddr: confignet.TCPAddr{
 				Endpoint: "", // set during config sanitization
 			},
 		},
 
-		Traces: TracesConfig{
+		Traces: config.TracesConfig{
 			SampleRate: 1,
 			TCPAddr: confignet.TCPAddr{
 				Endpoint: "", // set during config sanitization
@@ -74,12 +69,12 @@ func createDefaultConfig() configmodels.Exporter {
 
 // createMetricsExporter creates a metrics exporter based on this config.
 func createMetricsExporter(
-	_ context.Context,
+	ctx context.Context,
 	params component.ExporterCreateParams,
 	c configmodels.Exporter,
 ) (component.MetricsExporter, error) {
 
-	cfg := c.(*Config)
+	cfg := c.(*config.Config)
 
 	params.Logger.Info("sanitizing Datadog metrics exporter configuration")
 	if err := cfg.Sanitize(); err != nil {
@@ -91,35 +86,18 @@ func createMetricsExporter(
 		return nil, err
 	}
 
-	go func() {
-		// Send host metadata
-		var sent bool
-		wait := 1 * time.Second
-		metadata := getHostMetadata(cfg)
-		for i := 0; i < maxRetries; i++ {
-			err := exp.pushHostMetadata(metadata)
-			if err != nil {
-				params.Logger.Warn("Sending host metadata failed", zap.Error(err))
-			} else {
-				sent = true
-				params.Logger.Info("Sent host metadata", zap.Int("numRetries", i))
-				break
-			}
-
-			time.Sleep(wait)
-			wait = 2 * wait
-		}
-
-		if !sent {
-			// log and continue without metadata
-			params.Logger.Error("Could not send host metadata", zap.Int("numRetries", maxRetries))
-		}
-	}()
+	// Start goroutine for pushing metadata
+	ctx, cancel := context.WithCancel(ctx)
+	go metadata.MetadataPusher(ctx, params.Logger, cfg)
 
 	return exporterhelper.NewMetricsExporter(
 		cfg,
 		exp.PushMetricsData,
 		exporterhelper.WithQueue(exporterhelper.CreateDefaultQueueSettings()),
 		exporterhelper.WithRetry(exporterhelper.CreateDefaultRetrySettings()),
+		exporterhelper.WithShutdown(func(context.Context) error {
+			cancel()
+			return nil
+		}),
 	)
 }

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package datadogexporter
+package config
 
 import (
 	"errors"
@@ -21,6 +21,11 @@ import (
 
 	"go.opentelemetry.io/collector/config/configmodels"
 	"go.opentelemetry.io/collector/config/confignet"
+)
+
+const (
+	// DefaultSite is the default site of the Datadog intake to send data to
+	DefaultSite = "datadoghq.com"
 )
 
 var (
