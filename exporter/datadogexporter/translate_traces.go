@@ -354,14 +354,15 @@ func attributeMapToStringMap(attrMap pdata.AttributeMap) map[string]string {
 // TODO: this seems to resolve to SPAN_KIND_UNSPECIFIED in e2e using jaeger receiver
 // even though span.kind is getting set at the app tracer level. Need to file bug ticket
 func spanKindToDatadogType(kind pdata.SpanKind) string {
-	switch kind {
-	case pdata.SpanKindCLIENT:
-		return "client"
-	case pdata.SpanKindSERVER:
-		return "server"
-	default:
-		return "custom"
-	}
+	return "web"
+	// switch kind {
+	// case pdata.SpanKindCLIENT:
+	// 	return "http"
+	// case pdata.SpanKindSERVER:
+	// 	return "web"
+	// default:
+	// 	return "custom"
+	// }
 }
 
 func setMetric(s *pb.Span, key string, v float64) {

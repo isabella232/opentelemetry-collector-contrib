@@ -15,6 +15,7 @@
 package datadogexporter
 
 import (
+	"fmt"
 	"github.com/DataDog/datadog-agent/pkg/trace/pb"
 	"github.com/DataDog/datadog-agent/pkg/trace/stats"
 )
@@ -27,10 +28,37 @@ const (
 func ComputeAPMStats(tracePayload *pb.TracePayload) *stats.Payload {
 
 	statsRawBuckets := make(map[int64]*stats.RawBucket)
+	statsDuration := statsBucketDuration
+	var earliestStart int64 = 1e0
+	var earliestEnd int64 = 1e0
+
+	for _, trace := range tracePayload.Traces {
+		for _, span := range trace.Spans {
+			tempStart := span.Start
+
+			tempEnd := span.Start + span.Duration
+
+			if earliestStart == 1e0 {
+				earliestStart = tempStart
+			} else if tempStart < earliestStart {
+				earliestStart = tempStart
+			}
+			if tempEnd > earliestEnd {
+				earliestEnd = tempEnd
+			}
+		}
+	}
+
+	if earliestStart != 1e0 {
+		fmt.Println("duration was")
+		fmt.Println(statsDuration)
+		statsDuration = earliestEnd - earliestStart
+		fmt.Println("duration is now")
+		fmt.Println(statsDuration)
+	}
 
 	for _, trace := range tracePayload.Traces {
 		spans := GetAnalyzedSpans(trace.Spans)
-
 		sublayers := stats.ComputeSublayers(trace.Spans)
 		for _, span := range spans {
 
@@ -38,12 +66,12 @@ func ComputeAPMStats(tracePayload *pb.TracePayload) *stats.Payload {
 			// E.g., for buckets of size 10, a span ends on 36 should be aggregated to the second bucket
 			// with bucketTS 30 (36 - 36 % 10). Create a new bucket if needed.
 			spanEnd := span.Start + span.Duration
-			bucketTS := spanEnd - (spanEnd % statsBucketDuration)
+			bucketTS := spanEnd - (spanEnd % statsDuration)
 			var statsRawBucket *stats.RawBucket
 			if existingBucket, ok := statsRawBuckets[bucketTS]; ok {
 				statsRawBucket = existingBucket
 			} else {
-				statsRawBucket = stats.NewRawBucket(bucketTS, statsBucketDuration)
+				statsRawBucket = stats.NewRawBucket(bucketTS, statsDuration)
 				statsRawBuckets[bucketTS] = statsRawBucket
 			}
 
@@ -56,6 +84,11 @@ func ComputeAPMStats(tracePayload *pb.TracePayload) *stats.Payload {
 				TopLevel: true,
 			}
 			statsRawBucket.HandleSpan(weightedSpan, tracePayload.Env, []string{}, sublayers)
+
+			// fmt.Println("Span")
+			// fmt.Println(span)
+			// fmt.Println("Raw Bucket")
+			// fmt.Println(statsRawBucket.Export())
 		}
 	}
 
@@ -64,6 +97,8 @@ func ComputeAPMStats(tracePayload *pb.TracePayload) *stats.Payload {
 	for _, statsRawBucket := range statsRawBuckets {
 		statsBuckets = append(statsBuckets, statsRawBucket.Export())
 	}
+
+	
 	return &stats.Payload{
 		HostName: tracePayload.HostName,
 		Env:      tracePayload.Env,
