@@ -17,6 +17,7 @@ package datadogexporter
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/DataDog/datadog-agent/pkg/trace/obfuscate"
 	"github.com/DataDog/datadog-agent/pkg/trace/pb"
@@ -84,10 +85,11 @@ func (exp *traceExporter) pushTraceData(
 	// TODO: is there any config we want here? OTEL has their own pipeline for regex obfuscation
 	ObfuscatePayload(exp.obfuscator, aggregatedTraces)
 
+	pushTime := time.Now().UnixNano()
 	for _, ddTracePayload := range aggregatedTraces {
 		// currently we don't want to do retries since api endpoints may not dedupe in certain situations
 		// adding a helper function here to make custom retry logic easier in the future
-		exp.pushWithRetry(ddTracePayload, 1, func() error {
+		exp.pushWithRetry(ddTracePayload, 1, pushTime, func() error {
 			return nil
 		})
 	}
@@ -96,7 +98,7 @@ func (exp *traceExporter) pushTraceData(
 }
 
 // gives us flexibility to add custom retry logic later
-func (exp *traceExporter) pushWithRetry(ddTracePayload *pb.TracePayload, maxRetries int, fn func() error) error {
+func (exp *traceExporter) pushWithRetry(ddTracePayload *pb.TracePayload, maxRetries int, pushTime int64, fn func() error) error {
 	err := exp.edgeConnection.SendTraces(context.Background(), ddTracePayload, maxRetries)
 
 	if err != nil {
@@ -104,7 +106,7 @@ func (exp *traceExporter) pushWithRetry(ddTracePayload *pb.TracePayload, maxRetr
 	}
 
 	// this is for generating metrics like hits, errors, and latency, it uses a separate endpoint than Traces
-	stats := ComputeAPMStats(ddTracePayload)
+	stats := ComputeAPMStats(ddTracePayload, pushTime)
 	errStats := exp.edgeConnection.SendStats(context.Background(), stats, maxRetries)
 
 	if errStats != nil {
