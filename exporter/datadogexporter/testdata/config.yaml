@@ -4,9 +4,6 @@ receivers:
 processors:
   exampleprocessor:
 
-  batch:
-    timeout: 10s
-
 exporters:
   datadog/api:
     hostname: customhostname
@@ -43,5 +40,5 @@ service:
 
     traces:
       receivers: [examplereceiver]
-      processors: [batch]
+      processors: []
       exporters: [datadog/api, datadog/invalid]
