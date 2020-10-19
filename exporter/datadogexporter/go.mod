@@ -3,7 +3,7 @@ module github.com/DataDog/opentelemetry-collector-contrib/exporter/datadogexport
 go 1.15
 
 require (
-	github.com/DataDog/datadog-agent v0.0.0-20200417180928-f454c60bc16f
+	github.com/DataDog/datadog-agent/pkg/trace/exportable v0.0.0-20201016145401-4646cf596b02
 	github.com/DataDog/viper v1.8.0 // indirect
 	github.com/census-instrumentation/opencensus-proto v0.3.0
 	github.com/cihub/seelog v0.0.0-20170130134532-f561c5e57575 // indirect

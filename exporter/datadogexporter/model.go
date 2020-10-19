@@ -15,12 +15,12 @@
 package datadogexporter
 
 import (
-	"github.com/DataDog/datadog-agent/pkg/trace/event"
-	"github.com/DataDog/datadog-agent/pkg/trace/obfuscate"
-	"github.com/DataDog/datadog-agent/pkg/trace/pb"
-	"github.com/DataDog/datadog-agent/pkg/trace/sampler"
-	"github.com/DataDog/datadog-agent/pkg/trace/stats"
-	"github.com/DataDog/datadog-agent/pkg/trace/traceutil"
+	"github.com/DataDog/datadog-agent/pkg/trace/exportable/event"
+	"github.com/DataDog/datadog-agent/pkg/trace/exportable/obfuscate"
+	"github.com/DataDog/datadog-agent/pkg/trace/exportable/pb"
+	"github.com/DataDog/datadog-agent/pkg/trace/exportable/sampler"
+	"github.com/DataDog/datadog-agent/pkg/trace/exportable/stats"
+	"github.com/DataDog/datadog-agent/pkg/trace/exportable/traceutil"
 )
 
 // ObfuscatePayload applies obfuscator rules to the trace payloads
@@ -84,7 +84,7 @@ func ComputeSublayerMetrics(t pb.Trace) {
 	subtraces := stats.ExtractSubtraces(t, root)
 	sublayers := make(map[*pb.Span][]stats.SublayerValue)
 	for _, subtrace := range subtraces {
-		subtraceSublayers := stats.ComputeSublayers(subtrace.Trace)
+		subtraceSublayers := stats.NewSublayerCalculator().ComputeSublayers(subtrace.Trace)
 		sublayers[subtrace.Root] = subtraceSublayers
 		stats.SetSublayersOnSpan(subtrace.Root, subtraceSublayers)
 	}

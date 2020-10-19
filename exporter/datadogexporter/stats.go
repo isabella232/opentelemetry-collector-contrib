@@ -15,8 +15,8 @@
 package datadogexporter
 
 import (
-	"github.com/DataDog/datadog-agent/pkg/trace/pb"
-	"github.com/DataDog/datadog-agent/pkg/trace/stats"
+	"github.com/DataDog/datadog-agent/pkg/trace/exportable/pb"
+	"github.com/DataDog/datadog-agent/pkg/trace/exportable/stats"
 )
 
 const (
@@ -32,7 +32,7 @@ func ComputeAPMStats(tracePayload *pb.TracePayload, pushTime int64) *stats.Paylo
 
 	for _, trace := range tracePayload.Traces {
 		spans := GetAnalyzedSpans(trace.Spans)
-		sublayers := stats.ComputeSublayers(trace.Spans)
+		sublayers := stats.NewSublayerCalculator().ComputeSublayers(trace.Spans)
 		for _, span := range spans {
 
 			// TODO: This is all hardcoded to assume 10s buckets for now

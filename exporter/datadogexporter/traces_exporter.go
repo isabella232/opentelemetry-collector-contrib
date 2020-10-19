@@ -19,8 +19,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/DataDog/datadog-agent/pkg/trace/obfuscate"
-	"github.com/DataDog/datadog-agent/pkg/trace/pb"
+	"github.com/DataDog/datadog-agent/pkg/trace/exportable/config/configdefs"
+	"github.com/DataDog/datadog-agent/pkg/trace/exportable/obfuscate"
+	"github.com/DataDog/datadog-agent/pkg/trace/exportable/pb"
 	"go.opentelemetry.io/collector/consumer/pdata"
 	"go.uber.org/zap"
 )
@@ -36,18 +37,24 @@ type traceExporter struct {
 func newTraceExporter(logger *zap.Logger, cfg *Config) (*traceExporter, error) {
 	// removes potentially sensitive info and PII, approach taken from serverless approach
 	// https://github.com/DataDog/datadog-serverless-functions/blob/11f170eac105d66be30f18eda09eca791bc0d31b/aws/logs_monitoring/trace_forwarder/cmd/trace/main.go#L43
-	obfuscator := obfuscate.NewObfuscator(&obfuscate.Config{
-		ES: obfuscate.JSONSettings{
+	obfuscator := obfuscate.NewObfuscator(&configdefs.ObfuscationConfig{
+		ES: configdefs.JSONObfuscationConfig{
 			Enabled: true,
 		},
-		Mongo: obfuscate.JSONSettings{
+		Mongo: configdefs.JSONObfuscationConfig{
 			Enabled: true,
 		},
-		RemoveQueryString: true,
-		RemovePathDigits:  true,
+		HTTP: configdefs.HTTPObfuscationConfig{
+			RemoveQueryString: true,
+			RemovePathDigits:  true,
+		},
 		RemoveStackTraces: true,
-		Redis:             true,
-		Memcached:         true,
+		Redis: configdefs.Enablable{
+			Enabled: true,
+		},
+		Memcached: configdefs.Enablable{
+			Enabled: true,
+		},
 	})
 
 	// Calculate tags at startup
