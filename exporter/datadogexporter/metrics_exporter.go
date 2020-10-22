@@ -16,7 +16,9 @@ package datadogexporter
 
 import (
 	"context"
+	"time"
 
+	gocache "github.com/patrickmn/go-cache"
 	"go.opentelemetry.io/collector/consumer/pdata"
 	"go.uber.org/zap"
 	"gopkg.in/zorkian/go-datadog-api.v2"
@@ -25,10 +27,15 @@ import (
 	"github.com/open-telemetry/opentelemetry-collector-contrib/exporter/datadogexporter/metadata"
 )
 
+const (
+	canonicalHostnameKey = "canonical_hostname"
+)
+
 type metricsExporter struct {
 	logger *zap.Logger
 	cfg    *config.Config
 	client *datadog.Client
+	cache  *gocache.Cache
 	tags   []string
 }
 
@@ -54,8 +61,9 @@ func newMetricsExporter(logger *zap.Logger, cfg *config.Config) (*metricsExporte
 
 	// Calculate tags at startup
 	tags := cfg.TagsConfig.GetTags(false)
+	cache := gocache.New(20*time.Minute, 10*time.Minute)
 
-	return &metricsExporter{logger, cfg, client, tags}, nil
+	return &metricsExporter{logger, cfg, client, cache, tags}, nil
 }
 
 func (exp *metricsExporter) processMetrics(metrics []datadog.Metric) {
@@ -70,7 +78,7 @@ func (exp *metricsExporter) processMetrics(metrics []datadog.Metric) {
 		}
 
 		if overrideHostname || metrics[i].GetHost() == "" {
-			metrics[i].Host = metadata.GetHost(exp.logger, exp.cfg)
+			metrics[i].Host = exp.getHost()
 		}
 
 		if addTags {
@@ -78,6 +86,16 @@ func (exp *metricsExporter) processMetrics(metrics []datadog.Metric) {
 		}
 
 	}
+}
+
+func (exp *metricsExporter) getHost() *string {
+	if cacheVal, ok := exp.cache.Get(canonicalHostnameKey); ok {
+		return cacheVal.(*string)
+	}
+
+	hostname := metadata.GetHost(exp.logger, exp.cfg)
+	exp.cache.Set(canonicalHostnameKey, hostname, gocache.NoExpiration)
+	return hostname
 }
 
 func (exp *metricsExporter) PushMetricsData(ctx context.Context, md pdata.Metrics) (int, error) {

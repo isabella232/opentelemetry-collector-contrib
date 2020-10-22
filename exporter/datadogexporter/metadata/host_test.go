@@ -23,7 +23,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/exporter/datadogexporter/config"
-	"github.com/open-telemetry/opentelemetry-collector-contrib/exporter/datadogexporter/utils/cache"
 )
 
 func TestHost(t *testing.T) {
@@ -34,7 +33,6 @@ func TestHost(t *testing.T) {
 		TagsConfig: config.TagsConfig{Hostname: "test-host"},
 	})
 	assert.Equal(t, *host, "test-host")
-	cache.Cache.Delete(cache.CanonicalHostnameKey)
 
 	host = GetHost(logger, &config.Config{})
 	osHostname, err := os.Hostname()

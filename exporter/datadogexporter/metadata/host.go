@@ -20,19 +20,13 @@ import (
 	"github.com/open-telemetry/opentelemetry-collector-contrib/exporter/datadogexporter/config"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/exporter/datadogexporter/metadata/system"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/exporter/datadogexporter/metadata/valid"
-	"github.com/open-telemetry/opentelemetry-collector-contrib/exporter/datadogexporter/utils/cache"
 )
 
 // GetHost gets the hostname according to configuration.
 // It gets the configuration hostname and if
 // not available it relies on the OS hostname
 func GetHost(logger *zap.Logger, cfg *config.Config) *string {
-	if cacheVal, ok := cache.Cache.Get(cache.CanonicalHostnameKey); ok {
-		return cacheVal.(*string)
-	}
-
 	if err := valid.Hostname(cfg.Hostname); err == nil {
-		cache.Cache.Add(cache.CanonicalHostnameKey, &cfg.Hostname, cache.NoExpiration)
 		return &cfg.Hostname
 	} else if cfg.Hostname != "" {
 		logger.Error("Hostname set in configuration is invalid", zap.Error(err))
@@ -48,6 +42,5 @@ func GetHost(logger *zap.Logger, cfg *config.Config) *string {
 	}
 
 	logger.Debug("Canonical hostname automatically set", zap.String("hostname", hostname))
-	cache.Cache.Set(cache.CanonicalHostnameKey, &hostname, cache.NoExpiration)
 	return &hostname
 }
