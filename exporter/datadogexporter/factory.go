@@ -58,6 +58,9 @@ func createDefaultConfig() configmodels.Exporter {
 			TCPAddr: confignet.TCPAddr{
 				Endpoint: "", // set during config sanitization
 			},
+			ExporterConfig: config.ExporterConfig{
+				ResourceAttributesAsTags: false,
+			},
 		},
 
 		Traces: config.TracesConfig{
@@ -105,7 +108,7 @@ func createMetricsExporter(
 		exporterhelper.WithQueue(exporterhelper.CreateDefaultQueueSettings()),
 		exporterhelper.WithRetry(exporterhelper.CreateDefaultRetrySettings()),
 		exporterhelper.WithResourceToTelemetryConversion(exporterhelper.ResourceToTelemetrySettings{
-			Enabled: true,
+			Enabled: cfg.Metrics.ExporterConfig.ResourceAttributesAsTags,
 		}),
 		exporterhelper.WithShutdown(func(context.Context) error {
 			cancel()
