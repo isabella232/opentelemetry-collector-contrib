@@ -104,6 +104,9 @@ func createMetricsExporter(
 		exp.PushMetricsData,
 		exporterhelper.WithQueue(exporterhelper.CreateDefaultQueueSettings()),
 		exporterhelper.WithRetry(exporterhelper.CreateDefaultRetrySettings()),
+		exporterhelper.WithResourceToTelemetryConversion(exporterhelper.ResourceToTelemetrySettings{
+			Enabled: true,
+		}),
 		exporterhelper.WithShutdown(func(context.Context) error {
 			cancel()
 			return nil
