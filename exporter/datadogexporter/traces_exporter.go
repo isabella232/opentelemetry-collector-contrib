@@ -16,6 +16,7 @@ package datadogexporter
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/DataDog/datadog-agent/pkg/trace/exportable/config/configdefs"
@@ -38,6 +39,7 @@ type traceExporter struct {
 	edgeConnection TraceEdgeConnection
 	obfuscator     *obfuscate.Obfuscator
 	client         *datadog.Client
+	calculatorPool *sync.Pool
 }
 
 var (
@@ -67,12 +69,19 @@ func newTraceExporter(params component.ExporterCreateParams, cfg *config.Config)
 	// https://github.com/DataDog/datadog-serverless-functions/blob/11f170eac105d66be30f18eda09eca791bc0d31b/aws/logs_monitoring/trace_forwarder/cmd/trace/main.go#L43
 	obfuscator := obfuscate.NewObfuscator(obfuscatorConfig)
 
+	calculatorPool := &sync.Pool{
+		New: func() interface{} {
+			return stats.NewSublayerCalculator()
+		},
+	}
+
 	exporter := &traceExporter{
 		logger:         params.Logger,
 		cfg:            cfg,
 		edgeConnection: CreateTraceEdgeConnection(cfg.Traces.TCPAddr.Endpoint, cfg.API.Key, params.ApplicationStartInfo),
 		obfuscator:     obfuscator,
 		client:         client,
+		calculatorPool: calculatorPool,
 	}
 
 	return exporter, nil
@@ -94,7 +103,8 @@ func (exp *traceExporter) pushTraceData(
 	td pdata.Traces,
 ) (int, error) {
 
-	calculator := stats.NewSublayerCalculator()
+	calculator := exp.calculatorPool.Get().(*stats.SublayerCalculator)
+	defer exp.calculatorPool.Put(calculator)
 
 	// convert traces to datadog traces and group trace payloads by env
 	// we largely apply the same logic as the serverless implementation, simplified a bit
