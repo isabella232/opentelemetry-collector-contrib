@@ -77,12 +77,14 @@ func GetAnalyzedSpans(sps []*pb.Span) []*pb.Span {
 
 // Compute Sublayers updates a spans metrics with relevant metadata so that it's duration and breakdown between different services can
 // be accurately displayed in the Datadog UI
-func ComputeSublayerMetrics(calculator *stats.SublayerCalculator, t pb.Trace) {
+func ComputeSublayerMetrics(calculator *sublayerCalculator, t pb.Trace) {
 	root := traceutil.GetRoot(t)
 	traceutil.ComputeTopLevel(t)
 
 	subtraces := stats.ExtractSubtraces(t, root)
 	sublayers := make(map[*pb.Span][]stats.SublayerValue)
+	calculator.Lock()
+	defer calculator.Unlock()
 	for _, subtrace := range subtraces {
 		subtraceSublayers := calculator.ComputeSublayers(subtrace.Trace)
 		sublayers[subtrace.Root] = subtraceSublayers
